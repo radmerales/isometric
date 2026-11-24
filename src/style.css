@@ -6,6 +6,10 @@
   --accent: #f5c518;
   --accent-ink: #040404;
   --hairline: #cbcac7;
+  --water: #78a3b5;
+  --water-deep: #5f8b9c;
+  --water-foam: #dce9ee;
+  --water-ripple: #c6dde4;
 
   --sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
   --mono: "IBM Plex Mono", ui-monospace, monospace;
@@ -170,7 +174,9 @@ button {
 }
 
 .clear:focus-visible,
-.tool:focus-visible {
+.tool:focus-visible,
+.view-button:focus-visible,
+.zoom-value:focus-visible {
   outline: 2px solid var(--ink);
   outline-offset: 2px;
 }
@@ -185,51 +191,69 @@ button {
   background: var(--paper);
 }
 
-.stage::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background-image: radial-gradient(rgba(63, 62, 62, 0.15) 0.7px, transparent 0.8px);
-  background-size: 16px 16px;
-  pointer-events: none;
-}
-
 #city {
   position: absolute;
   inset: 0;
   display: block;
   width: 100%;
   height: 100%;
-  touch-action: pinch-zoom;
+  touch-action: none;
   user-select: none;
   -webkit-user-select: none;
+  cursor: crosshair;
 }
 
-.tile {
-  cursor: pointer;
+#city.is-pan {
+  cursor: grab;
 }
 
-.tile-top {
+#city.is-pan.is-grabbing {
+  cursor: grabbing;
+}
+
+.tile-ground {
   stroke: var(--hairline);
   stroke-width: 0.8;
 }
 
-.tile:hover .tile-top {
+.water-ground {
+  stroke: var(--water-deep);
+}
+
+.water-bank {
+  fill: none;
+  stroke: var(--water-foam);
+  stroke-width: 1.4;
+  stroke-linecap: round;
+}
+
+.water-wave {
+  fill: none;
+  stroke: var(--water-ripple);
+  stroke-width: 1;
+  stroke-linecap: round;
+  opacity: 0.55;
+}
+
+.bridge-deck {
   stroke: var(--muted);
+  stroke-width: 1.1;
+  stroke-linejoin: round;
+}
+
+.bridge-rail {
+  stroke: var(--muted);
+  stroke-width: 1;
+  stroke-linecap: round;
+  opacity: 0.75;
 }
 
 .hover-ring {
   fill: var(--accent);
-  opacity: 0;
+  opacity: 0.22;
+  stroke: var(--accent);
+  stroke-width: 1.2;
   pointer-events: none;
-}
-
-.tile:hover .hover-ring {
-  opacity: 0.32;
-}
-
-#city.is-erase .tile {
-  cursor: crosshair;
 }
 
 .building polygon,
@@ -246,16 +270,96 @@ button {
   stroke-linecap: butt;
 }
 
+/* ---------- view controls ---------- */
+
+.view-controls {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 2;
+  display: flex;
+  align-items: stretch;
+  height: 32px;
+  border: 1px solid var(--hairline);
+  background: var(--paper);
+}
+
+.view-controls > * + * {
+  border-left: 1px solid var(--hairline);
+}
+
+.view-button,
+.zoom-value {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+  transition: background-color 120ms ease;
+}
+
+.view-button {
+  width: 32px;
+  font-size: 16px;
+  line-height: 1;
+}
+
+.view-button svg {
+  width: 16px;
+  height: 16px;
+}
+
+.zoom-value {
+  min-width: 52px;
+  padding: 0 6px;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  font-variant-numeric: tabular-nums;
+}
+
+.view-button:hover,
+.zoom-value:hover {
+  background: var(--surface);
+}
+
+.view-button[aria-pressed="true"] {
+  background: var(--accent);
+}
+
+.stage-hint {
+  position: absolute;
+  bottom: 12px;
+  left: 20px;
+  margin: 0;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  pointer-events: none;
+  opacity: 0.8;
+}
+
 .ghost {
-  opacity: 0.55;
+  opacity: 0.68;
   pointer-events: none;
 }
 
 .ghost-pad {
   fill: var(--accent);
-  opacity: 0.55;
+  opacity: 0.5;
   stroke: var(--muted);
   stroke-width: 1;
+}
+
+.ghost-outline {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 1.6;
 }
 
 .ghost-x {
@@ -340,6 +444,14 @@ button {
   color: var(--ink);
 }
 
+.tool[data-tool="water"] .tool-icon {
+  color: var(--water-deep);
+}
+
+.tool[data-tool="water"][aria-pressed="true"] .tool-icon {
+  color: var(--ink);
+}
+
 .dock-hint {
   margin: 0;
   color: var(--muted);
@@ -354,6 +466,12 @@ button {
 
 @media (max-width: 860px) {
   .dock-hint {
+    display: none;
+  }
+}
+
+@media (max-width: 760px) {
+  .stage-hint {
     display: none;
   }
 }
@@ -395,6 +513,20 @@ button {
     display: none;
   }
 
+  .view-controls {
+    top: 10px;
+    right: 10px;
+    height: 30px;
+  }
+
+  .view-button {
+    width: 30px;
+  }
+
+  .zoom-value {
+    min-width: 48px;
+  }
+
   .dock {
     padding: 8px 10px;
   }
@@ -410,7 +542,7 @@ button {
     flex-direction: column;
     justify-content: center;
     gap: 3px;
-    padding: 6px 2px;
+    padding: 6px 1px;
   }
 
   .tool-label {
