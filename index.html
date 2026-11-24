@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="%BASE_URL%favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="A tiny isometric city builder. Pick a tool, click a tile, and build a small paper city."
+    />
+    <meta name="theme-color" content="#e9e9e5" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <title>iso.city — a small isometric city</title>
+  </head>
+  <body>
+    <div id="app">
+      <header class="topbar">
+        <div class="brand">
+          <p class="eyebrow mono"><span class="brand-mark" aria-hidden="true"></span>iso.city</p>
+          <h1>A simple city</h1>
+          <p class="lede">Twelve by twelve tiles. Pick a tool and click to build.</p>
+        </div>
+
+        <div class="meta">
+          <div class="stats" aria-live="polite">
+            <div class="stat">
+              <span class="label mono">tiles</span>
+              <span class="value mono" id="tile-count">00</span>
+            </div>
+            <div class="stat">
+              <span class="label mono">people</span>
+              <span class="value mono" id="pop-count">000</span>
+            </div>
+          </div>
+          <span class="save mono" id="save-status">
+            <span class="dot" aria-hidden="true"></span>
+            <span id="save-label">saved</span>
+          </span>
+          <button class="clear" id="clear" type="button" title="Clear the whole city" aria-label="Clear the whole city">Clear</button>
+        </div>
+      </header>
+
+      <main class="stage">
+        <svg
+          id="city"
+          viewBox="-400 -92 800 508"
+          preserveAspectRatio="xMidYMid meet"
+          role="img"
+          aria-label="Isometric city grid"
+        >
+          <title>Isometric city grid</title>
+          <g id="board"></g>
+          <g id="tiles"></g>
+          <g id="ghost" class="ghost" pointer-events="none"></g>
+        </svg>
+      </main>
+
+      <footer class="dock">
+        <div class="tools" role="toolbar" aria-label="Build tools">
+          <button class="tool" type="button" data-tool="road" aria-pressed="false">
+            <span class="tool-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 3.5 20.5 12 12 20.5 3.5 12 12 3.5Z" />
+                <path d="M8 8.5 16 15.5" />
+                <circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none" />
+              </svg>
+            </span>
+            <span class="tool-label">Road</span>
+            <kbd class="key mono">1</kbd>
+          </button>
+
+          <button class="tool" type="button" data-tool="house" aria-pressed="true">
+            <span class="tool-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 2.5 19.5 6.5 12 10.5 4.5 6.5 12 2.5Z" fill="currentColor" fill-opacity=".18" />
+                <path d="M4.5 6.5v7L12 18l7.5-4.5v-7" />
+                <path d="M12 10.5V18" />
+              </svg>
+            </span>
+            <span class="tool-label">House</span>
+            <kbd class="key mono">2</kbd>
+          </button>
+
+          <button class="tool" type="button" data-tool="tower" aria-pressed="false">
+            <span class="tool-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 2 18 5.5 12 9 6 5.5 12 2Z" />
+                <path d="M6 5.5V18l6 3.5 6-3.5V5.5" />
+                <path d="M12 9v12.5" />
+                <path d="M9 12.5v2M15 12.5v2" />
+              </svg>
+            </span>
+            <span class="tool-label">Tower</span>
+            <kbd class="key mono">3</kbd>
+          </button>
+
+          <button class="tool" type="button" data-tool="tree" aria-pressed="false">
+            <span class="tool-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 2.5 19 9.5 12 12 5 9.5 12 2.5Z" />
+                <path d="M12 12v9" />
+                <path d="M8 21h8" />
+              </svg>
+            </span>
+            <span class="tool-label">Tree</span>
+            <kbd class="key mono">4</kbd>
+          </button>
+
+          <button class="tool" type="button" data-tool="erase" aria-pressed="false">
+            <span class="tool-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 3.5 20.5 12 12 20.5 3.5 12 12 3.5Z" />
+                <path d="m9 9 6 6M15 9l-6 6" />
+              </svg>
+            </span>
+            <span class="tool-label">Erase</span>
+            <kbd class="key mono">X</kbd>
+          </button>
+        </div>
+
+        <p class="dock-hint">Click to build · drag to paint · right-click to clear</p>
+      </footer>
+    </div>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
