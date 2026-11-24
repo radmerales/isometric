@@ -39,6 +39,10 @@ const BRIDGE = "#c0bdb6"
 const DETAIL = "#3f3e3e"
 const ACCENT = "#f5c518"
 const ACCENT_DARK = "#d6a900"
+const LAKE_ROOF = "#5d8fa2"
+const LAKE_ROOF_DARK = "#447084"
+const LAKE_GLASS = "#5f8fa2"
+const DECK = "#d2cab7"
 
 /* ---------- helpers ---------- */
 
@@ -65,6 +69,13 @@ function hashCell(gx: number, gy: number): number {
 }
 
 const round = (value: number): number => Math.round(value * 100) / 100
+
+const addPoint = (a: Point, b: Point): Point => [a[0] + b[0], a[1] + b[1]]
+const scalePoint = (a: Point, factor: number): Point => [a[0] * factor, a[1] * factor]
+const lerpPoint = (a: Point, b: Point, t: number): Point => [
+  a[0] + (b[0] - a[0]) * t,
+  a[1] + (b[1] - a[1]) * t,
+]
 
 const points = (list: Point[]): string =>
   list.map(([x, y]) => `${round(x)},${round(y)}`).join(" ")
@@ -123,7 +134,7 @@ function faceQuad(
 
 /* ---------- buildings ---------- */
 
-function houseMarkup(seed: number): string {
+function houseMarkup(seed: number, lakehouse: boolean): string {
   const rx = 21
   const ry = 10.5
   const wallHeight = 15 + (seed % 3)
@@ -141,17 +152,62 @@ function houseMarkup(seed: number): string {
     right: "#deddd9",
   })
 
-  const roofLeft = polygon([[-rx, wallTop], frontTop, apex], ACCENT)
-  const roofRight = polygon([frontTop, [rx, wallTop], apex], ACCENT_DARK)
+  const roofLeft = polygon([[-rx, wallTop], frontTop, apex], lakehouse ? LAKE_ROOF : ACCENT)
+  const roofRight = polygon([frontTop, [rx, wallTop], apex], lakehouse ? LAKE_ROOF_DARK : ACCENT_DARK)
 
   const rightU: Point = [rx, -ry]
   const rightV: Point = [0, wallHeight]
   const door = faceQuad(frontTop, rightU, rightV, 0.55, 0.78, 0.3, 1, DETAIL)
 
   const leftU: Point = [-rx, -ry]
-  const window = faceQuad(frontTop, leftU, rightV, 0.34, 0.52, 0.26, 0.5, DETAIL)
+  const window = faceQuad(
+    frontTop,
+    leftU,
+    rightV,
+    0.34,
+    0.52,
+    0.26,
+    0.5,
+    lakehouse ? LAKE_GLASS : DETAIL,
+  )
 
-  return `<g class="building">${walls}${roofLeft}${roofRight}${door}${window}</g>`
+  const deck = lakehouse ? lakeDeckMarkup(rx, ry) : ""
+
+  return `<g class="building house${lakehouse ? " lakehouse" : ""}">${walls}${roofLeft}${roofRight}${door}${window}${deck}</g>`
+}
+
+function lakeDeckMarkup(rx: number, ry: number): string {
+  const length = Math.hypot(ry, rx)
+  const depth = 4.5
+  const nx = (ry / length) * depth
+  const ny = (rx / length) * depth
+
+  const front: Point = [0, ry]
+  const right: Point = [rx, 0]
+  const frontOuter: Point = [nx, ry + ny]
+  const rightOuter: Point = [rx + nx, ny]
+
+  let planks = ""
+  for (const t of [0.4, 0.72]) {
+    planks += lineMarkup(lerpPoint(front, frontOuter, t), lerpPoint(right, rightOuter, t), "lake-plank")
+  }
+
+  const rail = lineMarkup(
+    [frontOuter[0], frontOuter[1] - 3.5],
+    [rightOuter[0], rightOuter[1] - 3.5],
+    "lake-rail",
+  )
+  const posts = [
+    lineMarkup(frontOuter, [frontOuter[0], frontOuter[1] - 3.5], "lake-post"),
+    lineMarkup(rightOuter, [rightOuter[0], rightOuter[1] - 3.5], "lake-post"),
+  ].join("")
+
+  return (
+    `<polygon class="lake-deck" points="${points([front, right, rightOuter, frontOuter])}" fill="${DECK}"/>` +
+    planks +
+    posts +
+    rail
+  )
 }
 
 function towerMarkup(seed: number): string {
@@ -227,10 +283,10 @@ function treeMarkup(seed: number): string {
   return `<g class="building" transform="scale(${scale})">${trunk}${canopyLeft}${canopyRight}</g>`
 }
 
-function buildingMarkup(cell: Structure, seed: number): string {
+function buildingMarkup(cell: Structure, seed: number, lakehouse = false): string {
   switch (cell) {
     case "house":
-      return houseMarkup(seed)
+      return houseMarkup(seed, lakehouse)
     case "tower":
       return towerMarkup(seed)
     case "tree":
@@ -246,6 +302,16 @@ const structures = new Map<string, Structure>()
 const water = new Set<string>()
 
 const hasWater = (gx: number, gy: number): boolean => water.has(tileKey(gx, gy))
+
+function isNearWater(gx: number, gy: number): boolean {
+  for (let dy = -2; dy <= 2; dy++) {
+    for (let dx = -2; dx <= 2; dx++) {
+      if (dx === 0 && dy === 0) continue
+      if (hasWater(gx + dx, gy + dy)) return true
+    }
+  }
+  return false
+}
 
 const isRoad = (gx: number, gy: number): boolean =>
   structures.get(tileKey(gx, gy)) === "road"
@@ -325,25 +391,31 @@ function bridgeMarkup(gx: number, gy: number): string {
   )
 }
 
-function tileMarkup(gx: number, gy: number, cell: Structure | undefined, isWater: boolean): string {
+function flatMarkup(gx: number, gy: number, cell: Structure | undefined, isWater: boolean): string {
   const needsGround = isWater || cell === "road"
-  let inner = ""
+  if (!needsGround) return ""
 
-  if (needsGround) {
-    const fill = isWater ? WATER : ROAD
-    const classes = `tile-ground${isWater ? " water-ground" : ""}`
-    inner += `<polygon class="${classes}" points="0,-16 32,0 0,16 -32,0" fill="${fill}"/>`
-    if (isWater) inner += waterDetailMarkup(gx, gy)
-  }
+  let inner = ""
+  const fill = isWater ? WATER : ROAD
+  const classes = `tile-ground${isWater ? " water-ground" : ""}`
+  inner += `<polygon class="${classes}" points="0,-16 32,0 0,16 -32,0" fill="${fill}"/>`
+  if (isWater) inner += waterDetailMarkup(gx, gy)
 
   if (cell === "road") {
     if (isWater) inner += bridgeMarkup(gx, gy)
     inner += roadMarkup(gx, gy)
-  } else if (cell) {
-    inner += buildingMarkup(cell, hashCell(gx, gy))
   }
 
-  return `<g class="tile" data-gx="${gx}" data-gy="${gy}" transform="translate(${isoX(gx, gy)} ${isoY(gx, gy)})">${inner}</g>`
+  return `<g class="flat-tile" data-gx="${gx}" data-gy="${gy}" transform="translate(${isoX(gx, gy)} ${isoY(gx, gy)})">${inner}</g>`
+}
+
+function objectMarkup(gx: number, gy: number, cell: Structure | undefined): string {
+  if (!cell || cell === "road") return ""
+
+  const lakehouse = cell === "house" && isNearWater(gx, gy)
+  const content = buildingMarkup(cell, hashCell(gx, gy), lakehouse)
+
+  return `<g class="tile-object" data-gx="${gx}" data-gy="${gy}" transform="translate(${isoX(gx, gy)} ${isoY(gx, gy)})">${content}</g>`
 }
 
 /* ---------- camera ---------- */
@@ -409,9 +481,16 @@ function renderTiles(): void {
 
   items.sort((a, b) => a.gx + a.gy - (b.gx + b.gy) || a.gx - b.gx)
 
-  tilesGroup.innerHTML = items
-    .map(({ gx, gy, cell, isWater }) => tileMarkup(gx, gy, cell, isWater))
-    .join("")
+  const flats: string[] = []
+  const objects: string[] = []
+
+  for (const { gx, gy, cell, isWater } of items) {
+    flats.push(flatMarkup(gx, gy, cell, isWater))
+    objects.push(objectMarkup(gx, gy, cell))
+  }
+
+  flatsGroup.innerHTML = flats.join("")
+  objectsGroup.innerHTML = objects.join("")
 }
 
 function requestRender(): void {
@@ -499,12 +578,15 @@ if (!stage) throw new Error("Missing .stage")
 
 const svg = element<SVGSVGElement>("city")
 const ground = element<SVGRectElement>("ground")
-const tilesGroup = element<SVGGElement>("tiles")
+const flatsGroup = element<SVGGElement>("flats")
+const carsGroup = element<SVGGElement>("cars")
+const objectsGroup = element<SVGGElement>("objects")
 const hoverGroup = element<SVGGElement>("hover")
 const ghostGroup = element<SVGGElement>("ghost")
 const builtCount = element<HTMLElement>("built-count")
 const popCount = element<HTMLElement>("pop-count")
 const clearButton = element<HTMLButtonElement>("clear")
+const generateButton = element<HTMLButtonElement>("generate")
 const saveStatus = element<HTMLElement>("save-status")
 const saveLabel = element<HTMLElement>("save-label")
 const panToggle = element<HTMLButtonElement>("pan-toggle")
@@ -663,6 +745,377 @@ function updateStats(): void {
   popCount.textContent = String(people).padStart(3, "0")
 }
 
+/* ---------- auto-build ---------- */
+
+const GENERATE_RADIUS = 8
+const STREET_STEP = 5
+
+const mod = (value: number, step: number): number => ((value % step) + step) % step
+
+const isEmptyLand = (gx: number, gy: number): boolean => {
+  const key = tileKey(gx, gy)
+  return !structures.has(key) && !water.has(key)
+}
+
+function hasRoadNeighbor(gx: number, gy: number): boolean {
+  return (
+    isRoad(gx + 1, gy) ||
+    isRoad(gx - 1, gy) ||
+    isRoad(gx, gy + 1) ||
+    isRoad(gx, gy - 1)
+  )
+}
+
+/**
+ * Fill a 17 × 17 district around the view centre. The district is anchored to
+ * a 5-tile street lattice: empty street-line tiles become roads, street-facing
+ * plots become houses, one corner of each block becomes a tower, and the
+ * remaining courts become trees. Water and existing structures are untouched.
+ */
+function autoBuild(): void {
+  const rect = svg.getBoundingClientRect()
+  const center = tileAtClient(rect.left + rect.width / 2, rect.top + rect.height / 2)
+  const centerGx = Math.round(center.gx / STREET_STEP) * STREET_STEP
+  const centerGy = Math.round(center.gy / STREET_STEP) * STREET_STEP
+  const minGx = centerGx - GENERATE_RADIUS
+  const maxGx = centerGx + GENERATE_RADIUS
+  const minGy = centerGy - GENERATE_RADIUS
+  const maxGy = centerGy + GENERATE_RADIUS
+
+  let added = 0
+  const put = (gx: number, gy: number, cell: Structure): void => {
+    structures.set(tileKey(gx, gy), cell)
+    added += 1
+  }
+
+  for (let gy = minGy; gy <= maxGy; gy++) {
+    for (let gx = minGx; gx <= maxGx; gx++) {
+      if (!isEmptyLand(gx, gy)) continue
+      if (mod(gx, STREET_STEP) === 0 || mod(gy, STREET_STEP) === 0) {
+        put(gx, gy, "road")
+      }
+    }
+  }
+
+  for (let gy = minGy; gy <= maxGy; gy++) {
+    for (let gx = minGx; gx <= maxGx; gx++) {
+      if (!isEmptyLand(gx, gy)) continue
+
+      if (hasRoadNeighbor(gx, gy)) {
+        const corner = mod(gx, STREET_STEP) === 1 && mod(gy, STREET_STEP) === 1
+        put(gx, gy, corner ? "tower" : "house")
+      } else {
+        put(gx, gy, "tree")
+      }
+    }
+  }
+
+  if (added === 0) return
+
+  persist()
+  updateStats()
+  requestRender()
+  updateGhost()
+  syncCars()
+}
+
+/* ---------- cars ---------- */
+
+interface CarPalette {
+  body: string
+  side: string
+  glass: string
+  roof: string
+}
+
+const CAR_PALETTES: CarPalette[] = [
+  { body: "#f5c518", side: "#c69c00", glass: "#2f2e2b", roof: "#f7f6f2" },
+  { body: "#f0efeb", side: "#cfcec9", glass: "#4e6f7c", roof: "#dfe9ec" },
+  { body: "#78a3b5", side: "#5f8b9c", glass: "#253d47", roof: "#e9f1f4" },
+]
+
+interface Car {
+  id: number
+  gx: number
+  gy: number
+  dx: number
+  dy: number
+  progress: number
+  speed: number
+  steps: number
+  palette: CarPalette
+  group: SVGGElement
+}
+
+interface CarDirection {
+  dx: number
+  dy: number
+}
+
+const CAR_DIRECTIONS: CarDirection[] = [
+  { dx: 1, dy: 0 },
+  { dx: -1, dy: 0 },
+  { dx: 0, dy: 1 },
+  { dx: 0, dy: -1 },
+]
+
+const cars: Car[] = []
+let nextCarId = 1
+let carSyncTimer: number | undefined
+
+function carPrism(base: Point[], height: number, topFill: string, sideFill: string): string {
+  const top = base.map(([x, y]): Point => [x, y - height])
+  const centerX = base.reduce((sum, p) => sum + p[0], 0) / base.length
+  const centerY = base.reduce((sum, p) => sum + p[1], 0) / base.length
+
+  let sides = ""
+  for (let i = 0; i < base.length; i++) {
+    const p = base[i]
+    const q = base[(i + 1) % base.length]
+    let nx = q[1] - p[1]
+    let ny = -(q[0] - p[0])
+    const length = Math.hypot(nx, ny) || 1
+    nx /= length
+    ny /= length
+
+    const midX = (p[0] + q[0]) / 2
+    const midY = (p[1] + q[1]) / 2
+    if ((midX - centerX) * nx + (midY - centerY) * ny < 0) {
+      nx = -nx
+      ny = -ny
+    }
+
+    if (ny > 0) {
+      sides += `<polygon class="car-side" points="${points([p, q, top[(i + 1) % base.length], top[i]])}" fill="${sideFill}"/>`
+    }
+  }
+
+  return sides + `<polygon class="car-body" points="${points(top)}" fill="${topFill}"/>`
+}
+
+function carMarkup(dx: number, dy: number, palette: CarPalette): string {
+  const a: Point = [(dx - dy) * 10, (dx + dy) * 5]
+  const b: Point = [-(dx + dy) * 4, (dx - dy) * 2]
+
+  const base: Point[] = [
+    addPoint(scalePoint(a, -1), b),
+    addPoint(a, b),
+    addPoint(a, scalePoint(b, -1)),
+    addPoint(scalePoint(a, -1), scalePoint(b, -1)),
+  ]
+
+  const shadow = `<polygon points="${points(base)}" transform="translate(0 2.2)" fill="#000000" opacity="0.13"/>`
+  const body = carPrism(base, 4.5, palette.body, palette.side)
+
+  const cabinCenter = addPoint(scalePoint(a, -0.08), [0, -4.5])
+  const cabinHalfLength = scalePoint(a, 0.42)
+  const cabinHalfWidth = scalePoint(b, 0.62)
+  const cabinBase: Point[] = [
+    addPoint(addPoint(cabinCenter, scalePoint(cabinHalfLength, -1)), cabinHalfWidth),
+    addPoint(addPoint(cabinCenter, cabinHalfLength), cabinHalfWidth),
+    addPoint(addPoint(cabinCenter, cabinHalfLength), scalePoint(cabinHalfWidth, -1)),
+    addPoint(addPoint(cabinCenter, scalePoint(cabinHalfLength, -1)), scalePoint(cabinHalfWidth, -1)),
+  ]
+  const cabin = carPrism(cabinBase, 3, palette.roof, palette.side)
+
+  const windCenter = addPoint(addPoint(cabinCenter, scalePoint(a, 0.18)), [0, -3])
+  const windHalfLength = scalePoint(a, 0.16)
+  const windHalfWidth = scalePoint(b, 0.48)
+  const windshield = `<polygon class="car-glass" points="${points([
+    addPoint(addPoint(windCenter, scalePoint(windHalfLength, -1)), windHalfWidth),
+    addPoint(addPoint(windCenter, windHalfLength), windHalfWidth),
+    addPoint(addPoint(windCenter, windHalfLength), scalePoint(windHalfWidth, -1)),
+    addPoint(addPoint(windCenter, scalePoint(windHalfLength, -1)), scalePoint(windHalfWidth, -1)),
+  ])}"/>`
+
+  return shadow + body + cabin + windshield
+}
+
+function setCarDirection(car: Car, dx: number, dy: number): void {
+  if (car.dx === dx && car.dy === dy) return
+  car.dx = dx
+  car.dy = dy
+  car.group.innerHTML = carMarkup(dx, dy, car.palette)
+}
+
+function setCarPosition(car: Car): void {
+  const fromX = isoX(car.gx, car.gy)
+  const fromY = isoY(car.gx, car.gy)
+  const toX = isoX(car.gx + car.dx, car.gy + car.dy)
+  const toY = isoY(car.gx + car.dx, car.gy + car.dy)
+  car.group.setAttribute(
+    "transform",
+    `translate(${fromX + (toX - fromX) * car.progress} ${fromY + (toY - fromY) * car.progress})`,
+  )
+}
+
+function parseTileKey(key: string): Tile {
+  const [gx, gy] = key.split(",").map(Number)
+  return { gx, gy }
+}
+
+function createCar(tile: Tile, direction: CarDirection): Car {
+  const id = nextCarId
+  nextCarId += 1
+
+  const palette = CAR_PALETTES[id % CAR_PALETTES.length]
+  const group = document.createElementNS("http://www.w3.org/2000/svg", "g")
+  group.setAttribute("class", "car")
+  group.setAttribute("data-id", String(id))
+  carsGroup.appendChild(group)
+
+  const car: Car = {
+    id,
+    gx: tile.gx,
+    gy: tile.gy,
+    dx: direction.dx,
+    dy: direction.dy,
+    progress: 0,
+    speed: 1.2 + (id % 3) * 0.18,
+    steps: 0,
+    palette,
+    group,
+  }
+
+  group.innerHTML = carMarkup(direction.dx, direction.dy, palette)
+  setCarPosition(car)
+  cars.push(car)
+  return car
+}
+
+function removeCar(car: Car): void {
+  car.group.remove()
+  const index = cars.indexOf(car)
+  if (index >= 0) cars.splice(index, 1)
+}
+
+function chooseCarDirection(car: Car): boolean {
+  const options = CAR_DIRECTIONS.filter((direction) =>
+    isRoad(car.gx + direction.dx, car.gy + direction.dy),
+  )
+  if (options.length === 0) return false
+
+  const nonReverse = options.filter(
+    (direction) => !(direction.dx === -car.dx && direction.dy === -car.dy),
+  )
+  const pool = nonReverse.length > 0 ? nonReverse : options
+  const forward = pool.find((direction) => direction.dx === car.dx && direction.dy === car.dy)
+  let next = forward
+
+  if (!next || car.steps % 4 === 0) {
+    const turns = pool.filter(
+      (direction) => direction.dx !== car.dx || direction.dy !== car.dy,
+    )
+    if (turns.length > 0) {
+      next = turns[(car.id + car.steps) % turns.length]
+    }
+  }
+
+  if (!next) next = pool[0]
+  setCarDirection(car, next.dx, next.dy)
+  return true
+}
+
+function syncCars(): void {
+  const candidates: Tile[] = []
+
+  for (const [key, cell] of structures) {
+    if (cell !== "road") continue
+    const tile = parseTileKey(key)
+    if (!hasRoadNeighbor(tile.gx, tile.gy)) continue
+    candidates.push(tile)
+  }
+
+  const target =
+    candidates.length === 0 ? 0 : clamp(Math.round(candidates.length / 10), 2, 18)
+
+  for (const car of [...cars]) {
+    if (!isRoad(car.gx, car.gy)) removeCar(car)
+  }
+  while (cars.length > target) {
+    removeCar(cars[cars.length - 1])
+  }
+  if (cars.length >= target) return
+
+  candidates.sort((a, b) => hashCell(a.gx, a.gy) - hashCell(b.gx, b.gy))
+  const occupied = new Set(cars.map((car) => tileKey(car.gx, car.gy)))
+
+  for (const tile of candidates) {
+    if (cars.length >= target) break
+    const key = tileKey(tile.gx, tile.gy)
+    if (occupied.has(key)) continue
+
+    const tooClose = cars.some(
+      (car) => Math.abs(car.gx - tile.gx) <= 1 && Math.abs(car.gy - tile.gy) <= 1,
+    )
+    if (tooClose) continue
+
+    const directions = CAR_DIRECTIONS.filter((direction) =>
+      isRoad(tile.gx + direction.dx, tile.gy + direction.dy),
+    )
+    if (directions.length === 0) continue
+
+    createCar(tile, directions[nextCarId % directions.length])
+    occupied.add(key)
+  }
+}
+
+function updateCars(dt: number): void {
+  for (const car of [...cars]) {
+    if (!isRoad(car.gx, car.gy)) {
+      removeCar(car)
+      continue
+    }
+
+    if (!isRoad(car.gx + car.dx, car.gy + car.dy)) {
+      car.progress = 0
+      if (!chooseCarDirection(car)) {
+        removeCar(car)
+        continue
+      }
+      if (!isRoad(car.gx + car.dx, car.gy + car.dy)) {
+        removeCar(car)
+        continue
+      }
+    }
+
+    car.progress += car.speed * dt
+
+    if (car.progress >= 1) {
+      car.gx += car.dx
+      car.gy += car.dy
+      car.progress -= 1
+      car.steps += 1
+
+      if (!isRoad(car.gx, car.gy) || !chooseCarDirection(car)) {
+        removeCar(car)
+        continue
+      }
+    }
+
+    setCarPosition(car)
+  }
+}
+
+function queueCarSync(): void {
+  if (carSyncTimer !== undefined) return
+  carSyncTimer = window.setTimeout(() => {
+    carSyncTimer = undefined
+    syncCars()
+  }, 350)
+}
+
+const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)")
+let carFrame = performance.now()
+
+function animateCars(now: number): void {
+  const dt = Math.min((now - carFrame) / 1000, 0.08)
+  carFrame = now
+
+  if (!reduceMotion.matches) updateCars(dt)
+  requestAnimationFrame(animateCars)
+}
+
 /* ---------- editing ---------- */
 
 function wouldChangeAt(tile: Tile): boolean {
@@ -716,6 +1169,7 @@ function placeTile(tile: Tile): void {
   updateStats()
   requestRender()
   updateGhost()
+  queueCarSync()
 }
 
 function eraseTile(tile: Tile): void {
@@ -725,6 +1179,7 @@ function eraseTile(tile: Tile): void {
     updateStats()
     requestRender()
     updateGhost()
+    queueCarSync()
     return
   }
   if (water.delete(key)) {
@@ -732,6 +1187,7 @@ function eraseTile(tile: Tile): void {
     updateStats()
     requestRender()
     updateGhost()
+    queueCarSync()
   }
 }
 
@@ -800,7 +1256,8 @@ function updateGhost(): void {
     if (isWater) {
       content = `<polygon class="tile-ground" points="0,-16 32,0 0,16 -32,0" fill="${LAND}"/>`
     }
-    content += buildingMarkup(tool, hashCell(gx, gy)) + outline
+    const lakehouse = tool === "house" && isNearWater(gx, gy)
+    content += buildingMarkup(tool, hashCell(gx, gy), lakehouse) + outline
   }
 
   ghostGroup.setAttribute("transform", `translate(${isoX(gx, gy)} ${isoY(gx, gy)})`)
@@ -876,13 +1333,18 @@ zoomReset.addEventListener("click", () => {
 
 clearButton.addEventListener("click", () => {
   if (structures.size === 0) return
-  if (!window.confirm("Clear all buildings and roads? The river stays.")) return
+  if (!window.confirm("Clear all buildings, roads, and trees? The river stays.")) return
 
   structures.clear()
   persist()
   updateStats()
   requestRender()
   updateGhost()
+  syncCars()
+})
+
+generateButton.addEventListener("click", () => {
+  autoBuild()
 })
 
 /* ---------- pointer helpers ---------- */
@@ -1261,6 +1723,12 @@ window.addEventListener("keydown", (event) => {
     return
   }
 
+  if (event.key.toLowerCase() === "g") {
+    event.preventDefault()
+    autoBuild()
+    return
+  }
+
   if (event.key.toLowerCase() === "h") {
     event.preventDefault()
     setPanMode(!panMode)
@@ -1325,6 +1793,8 @@ if (!loadSavedCity()) {
 updateStats()
 selectTool("house")
 persist()
+syncCars()
+requestAnimationFrame(animateCars)
 
 const resizeObserver = new ResizeObserver(() => {
   const width = stage.clientWidth

@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta
       name="description"
-      content="An endless isometric city builder. Pick a tool, click a tile, and build a small paper city along the river."
+      content="An endless isometric city builder with a river, bridges, lakehouses, and moving cars. Build by hand or auto-build a district."
     />
     <meta name="theme-color" content="#e9e9e5" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -23,7 +23,7 @@
         <div class="brand">
           <p class="eyebrow mono"><span class="brand-mark" aria-hidden="true"></span>iso.city</p>
           <h1>A simple city</h1>
-          <p class="lede">An endless paper grid. Pick a tool and build along the river.</p>
+          <p class="lede">An endless paper grid. Build along the river, or auto-build a district.</p>
         </div>
 
         <div class="meta">
@@ -41,7 +41,18 @@
             <span class="dot" aria-hidden="true"></span>
             <span id="save-label">saved</span>
           </span>
-          <button class="clear" id="clear" type="button" title="Clear all buildings and roads" aria-label="Clear all buildings and roads">Clear</button>
+          <div class="actions">
+            <button
+              class="generate"
+              id="generate"
+              type="button"
+              title="Fill a 17×17 district with streets, houses, towers, and trees (G)"
+              aria-label="Auto-build a district"
+            >
+              Auto-build
+            </button>
+            <button class="clear" id="clear" type="button" title="Clear all buildings, roads, and trees" aria-label="Clear all buildings, roads, and trees">Clear</button>
+          </div>
         </div>
       </header>
 
@@ -65,7 +76,9 @@
             </pattern>
           </defs>
           <rect id="ground" x="-10000" y="-10000" width="20000" height="20000" fill="url(#isogrid)" />
-          <g id="tiles"></g>
+          <g id="flats"></g>
+          <g id="cars" pointer-events="none"></g>
+          <g id="objects"></g>
           <g id="hover" pointer-events="none"></g>
           <g id="ghost" class="ghost" pointer-events="none"></g>
         </svg>

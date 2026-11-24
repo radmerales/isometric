@@ -107,6 +107,12 @@ button {
   gap: 16px;
 }
 
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .stats {
   display: flex;
   gap: 16px;
@@ -160,7 +166,11 @@ button {
 }
 
 .clear {
-  padding: 7px 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 32px;
+  padding: 0 12px;
   border: 1px solid var(--hairline);
   background: var(--paper);
   font-size: 12px;
@@ -173,7 +183,27 @@ button {
   border-color: var(--ink);
 }
 
+.generate {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--ink);
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: filter 120ms ease;
+}
+
+.generate:hover {
+  filter: brightness(0.96);
+}
+
 .clear:focus-visible,
+.generate:focus-visible,
 .tool:focus-visible,
 .view-button:focus-visible,
 .zoom-value:focus-visible {
@@ -262,6 +292,37 @@ button {
   stroke: var(--muted);
   stroke-width: 1;
   stroke-linejoin: round;
+}
+
+.lake-deck {
+  stroke: var(--muted);
+  stroke-width: 0.8;
+  stroke-linejoin: round;
+}
+
+.lake-plank {
+  stroke: #8d8677;
+  stroke-width: 0.6;
+  opacity: 0.55;
+}
+
+.lake-rail,
+.lake-post {
+  stroke: var(--muted);
+  stroke-width: 0.9;
+  stroke-linecap: round;
+}
+
+.car .car-body,
+.car .car-side {
+  stroke: var(--muted);
+  stroke-width: 0.75;
+  stroke-linejoin: round;
+}
+
+.car .car-glass {
+  stroke: none;
+  fill: #2f2e2b;
 }
 
 .road-mark line {
@@ -511,6 +572,17 @@ button {
 
   .save {
     display: none;
+  }
+
+  .generate {
+    height: 30px;
+    padding: 0 10px;
+    font-size: 11px;
+  }
+
+  .clear {
+    height: 30px;
+    padding: 0 10px;
   }
 
   .view-controls {
