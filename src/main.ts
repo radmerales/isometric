@@ -17,7 +17,7 @@ const POPULATION: Record<Building, number> = {
   tree: 0,
 }
 
-const ICON_COLOR = "#3f3e3e"
+const DETAIL_COLOR = "#3f3e3e"
 const ACCENT = "#f5c518"
 const ACCENT_DARK = "#d6a900"
 const ROAD = "#b4b2ad"
@@ -118,10 +118,10 @@ function houseMarkup(seed: number): string {
 
   const rightU: Point = [rx, -ry]
   const rightV: Point = [0, wallHeight]
-  const door = faceQuad(frontTop, rightU, rightV, 0.55, 0.78, 0.3, 1, ICON_COLOR)
+  const door = faceQuad(frontTop, rightU, rightV, 0.55, 0.78, 0.3, 1, DETAIL_COLOR)
 
   const leftU: Point = [-rx, -ry]
-  const window = faceQuad(frontTop, leftU, rightV, 0.34, 0.52, 0.26, 0.5, ICON_COLOR)
+  const window = faceQuad(frontTop, leftU, rightV, 0.34, 0.52, 0.26, 0.5, DETAIL_COLOR)
 
   return `<g class="building">${walls}${roofLeft}${roofRight}${door}${window}</g>`
 }
@@ -170,11 +170,11 @@ function towerMarkup(seed: number): string {
   let windows = ""
   for (const [u1, u2] of columns) {
     for (const [v1, v2] of rows) {
-      windows += faceQuad(frontTop, rightU, down, u1, u2, v1, v2, ICON_COLOR)
+      windows += faceQuad(frontTop, rightU, down, u1, u2, v1, v2, DETAIL_COLOR)
     }
   }
   for (const [v1, v2] of rows) {
-    windows += faceQuad(frontTop, leftU, down, 0.34, 0.5, v1, v2, ICON_COLOR)
+    windows += faceQuad(frontTop, leftU, down, 0.34, 0.5, v1, v2, DETAIL_COLOR)
   }
 
   return `<g class="building">${body}${cap}${windows}</g>`
@@ -246,15 +246,12 @@ function tileMarkup(index: number): string {
   const cell = cells[index]
   const groundFill = (gx + gy) % 2 === 0 ? "#e6e5e1" : "#e2e1dd"
 
-  const ground = polygon(
-    [
-      [0, -16],
-      [32, 0],
-      [0, 16],
-      [-32, 0],
-    ],
-    cell === "road" ? ROAD : groundFill,
-  ).replace("<polygon", '<polygon class="tile-top"')
+  const ground = `<polygon class="tile-top" points="${points([
+    [0, -16],
+    [32, 0],
+    [0, 16],
+    [-32, 0],
+  ])}" fill="${cell === "road" ? ROAD : groundFill}"/>`
 
   const hoverRing = `<polygon class="hover-ring" points="0,-13.5 27,0 0,13.5 -27,0"/>`
 
