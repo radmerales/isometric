@@ -9,6 +9,7 @@ const MAX_ZOOM = 2.6
 const RENDER_MARGIN = 4
 const SAVE_KEY = "isocity:city:v2"
 const LEGACY_KEY = "isocity:city:v1"
+const THEME_KEY = "isocity:theme"
 const INITIAL_CENTER = { x: 0, y: 176 }
 
 type Structure = "road" | "house" | "tower" | "tree"
@@ -32,17 +33,16 @@ const POPULATION: Record<Structure, number> = {
   tree: 0,
 }
 
-const LAND = "#e6e5e1"
-const WATER = "#78a3b5"
-const ROAD = "#b4b2ad"
-const BRIDGE = "#c0bdb6"
-const DETAIL = "#3f3e3e"
-const ACCENT = "#f5c518"
-const ACCENT_DARK = "#d6a900"
-const LAKE_ROOF = "#5d8fa2"
-const LAKE_ROOF_DARK = "#447084"
-const LAKE_GLASS = "#5f8fa2"
-const DECK = "#d2cab7"
+const LAND = "var(--land)"
+const WATER = "var(--water)"
+const ROAD = "var(--road)"
+const BRIDGE = "var(--bridge)"
+const ACCENT = "var(--roof)"
+const ACCENT_DARK = "var(--roof-dark)"
+const LAKE_ROOF = "var(--lake-roof)"
+const LAKE_ROOF_DARK = "var(--lake-roof-dark)"
+const LAKE_GLASS = "var(--lake-glass)"
+const DECK = "var(--deck)"
 
 /* ---------- helpers ---------- */
 
@@ -147,9 +147,9 @@ function houseMarkup(seed: number, lakehouse: boolean): string {
     rx,
     ry,
     h: wallHeight,
-    top: "#f7f6f2",
-    left: "#f3f2ee",
-    right: "#deddd9",
+    top: "var(--wall-top)",
+    left: "var(--wall-left)",
+    right: "var(--wall-right)",
   })
 
   const roofLeft = polygon([[-rx, wallTop], frontTop, apex], lakehouse ? LAKE_ROOF : ACCENT)
@@ -157,7 +157,7 @@ function houseMarkup(seed: number, lakehouse: boolean): string {
 
   const rightU: Point = [rx, -ry]
   const rightV: Point = [0, wallHeight]
-  const door = faceQuad(frontTop, rightU, rightV, 0.55, 0.78, 0.3, 1, DETAIL)
+  const door = faceQuad(frontTop, rightU, rightV, 0.55, 0.78, 0.3, 1, "var(--door)")
 
   const leftU: Point = [-rx, -ry]
   const window = faceQuad(
@@ -168,7 +168,7 @@ function houseMarkup(seed: number, lakehouse: boolean): string {
     0.52,
     0.26,
     0.5,
-    lakehouse ? LAKE_GLASS : DETAIL,
+    lakehouse ? LAKE_GLASS : "var(--window)",
   )
 
   const deck = lakehouse ? lakeDeckMarkup(rx, ry) : ""
@@ -221,9 +221,9 @@ function towerMarkup(seed: number): string {
     rx,
     ry,
     h: baseHeight,
-    top: "#eceae6",
-    left: "#f4f3ef",
-    right: "#deddd9",
+    top: "var(--tower-top)",
+    left: "var(--tower-left)",
+    right: "var(--tower-right)",
   })
 
   const cap = box({
@@ -232,7 +232,7 @@ function towerMarkup(seed: number): string {
     h: capHeight,
     y: topY,
     top: ACCENT,
-    left: "#e8b400",
+    left: "var(--cap-left)",
     right: ACCENT_DARK,
   })
 
@@ -254,11 +254,11 @@ function towerMarkup(seed: number): string {
   let windows = ""
   for (const [u1, u2] of columns) {
     for (const [v1, v2] of rows) {
-      windows += faceQuad(frontTop, rightU, down, u1, u2, v1, v2, DETAIL)
+      windows += faceQuad(frontTop, rightU, down, u1, u2, v1, v2, "var(--window)")
     }
   }
   for (const [v1, v2] of rows) {
-    windows += faceQuad(frontTop, leftU, down, 0.34, 0.5, v1, v2, DETAIL)
+    windows += faceQuad(frontTop, leftU, down, 0.34, 0.5, v1, v2, "var(--window)")
   }
 
   return `<g class="building">${body}${cap}${windows}</g>`
@@ -270,15 +270,15 @@ function treeMarkup(seed: number): string {
     rx: 4,
     ry: 2,
     h: 9,
-    top: "#55534e",
-    left: "#46443f",
-    right: "#33322e",
+    top: "var(--tree-trunk-top)",
+    left: "var(--tree-trunk-left)",
+    right: "var(--tree-trunk-right)",
   })
 
   const baseY = -9
   const apexY = baseY - (18 + (seed % 2) * 4)
-  const canopyLeft = polygon([[-14, baseY], [0, baseY + 7], [0, apexY]], "#4a4844")
-  const canopyRight = polygon([[0, baseY + 7], [14, baseY], [0, apexY]], "#32312e")
+  const canopyLeft = polygon([[-14, baseY], [0, baseY + 7], [0, apexY]], "var(--tree-light)")
+  const canopyRight = polygon([[0, baseY + 7], [14, baseY], [0, apexY]], "var(--tree-dark)")
 
   return `<g class="building" transform="scale(${scale})">${trunk}${canopyLeft}${canopyRight}</g>`
 }
@@ -587,6 +587,7 @@ const builtCount = element<HTMLElement>("built-count")
 const popCount = element<HTMLElement>("pop-count")
 const clearButton = element<HTMLButtonElement>("clear")
 const generateButton = element<HTMLButtonElement>("generate")
+const themeToggle = element<HTMLButtonElement>("theme-toggle")
 const saveStatus = element<HTMLElement>("save-status")
 const saveLabel = element<HTMLElement>("save-label")
 const panToggle = element<HTMLButtonElement>("pan-toggle")
@@ -1264,6 +1265,37 @@ function updateGhost(): void {
   ghostGroup.innerHTML = content
 }
 
+/* ---------- theme ---------- */
+
+type Theme = "light" | "dark"
+
+function currentTheme(): Theme {
+  return document.documentElement.dataset.theme === "dark" ? "dark" : "light"
+}
+
+function applyTheme(theme: Theme, remember: boolean): void {
+  document.documentElement.dataset.theme = theme
+
+  const next = theme === "light" ? "dark" : "light"
+  themeToggle.setAttribute("aria-label", `Switch to ${next} theme`)
+  themeToggle.title = `Switch to ${next} theme (T)`
+
+  const meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]')
+  if (meta) meta.content = theme === "light" ? "#e9e9e5" : "#17181b"
+
+  if (remember) {
+    try {
+      localStorage.setItem(THEME_KEY, theme)
+    } catch {
+      // The theme still applies for this session.
+    }
+  }
+}
+
+function toggleTheme(): void {
+  applyTheme(currentTheme() === "light" ? "dark" : "light", true)
+}
+
 /* ---------- tools + controls ---------- */
 
 function selectTool(next: Tool): void {
@@ -1345,6 +1377,10 @@ clearButton.addEventListener("click", () => {
 
 generateButton.addEventListener("click", () => {
   autoBuild()
+})
+
+themeToggle.addEventListener("click", () => {
+  toggleTheme()
 })
 
 /* ---------- pointer helpers ---------- */
@@ -1729,6 +1765,12 @@ window.addEventListener("keydown", (event) => {
     return
   }
 
+  if (event.key.toLowerCase() === "t") {
+    event.preventDefault()
+    toggleTheme()
+    return
+  }
+
   if (event.key.toLowerCase() === "h") {
     event.preventDefault()
     setPanMode(!panMode)
@@ -1785,6 +1827,8 @@ window.addEventListener("blur", () => {
 
 hoverGroup.innerHTML = `<polygon class="hover-ring" points="0,-13 27,0 0,13 -27,0"/>`
 hoverGroup.style.display = "none"
+
+applyTheme(currentTheme(), false)
 
 if (!loadSavedCity()) {
   starterCity()

@@ -3,12 +3,17 @@
 A tiny endless isometric city builder for the browser. Build by hand along the
 river, or press **Auto-build** to fill a rule-generated district. Roads and
 rivers connect on their own, houses near the water become lakehouses, and little
-cars drive through the streets. Every change is saved to `localStorage`, and the
-static build deploys to GitHub Pages with no backend.
+cars drive through the streets. Switch between a light paper theme and a dark
+night edition. Every change is saved to `localStorage`, and the static build
+deploys to GitHub Pages with no backend.
 
 **Live:** <https://radmerales.github.io/isometric/>
 
-<img src="preview.png" alt="A dense generated isometric district with lakehouses, trees, and cars" width="1200" />
+<p><em>Light mode</em></p>
+<img src="preview.png" alt="A generated isometric district in light mode, with lakehouses, trees, and cars" width="1200" />
+
+<p><em>Dark mode</em></p>
+<img src="preview-dark.png" alt="The same generated district in dark mode, with lit windows" width="1200" />
 
 ## Features
 
@@ -22,6 +27,8 @@ static build deploys to GitHub Pages with no backend.
   blue window glass
 - **Moving cars** follow the road network, turn at intersections, and scale with
   the size of the city
+- **Light and dark themes** with a header toggle, saved per browser; lit windows
+  appear at night
 - Roads auto-connect; roads laid over water become bridges
 - Roads, houses, towers, trees, water, and erase tools
 - Live built/population counts and browser autosave
@@ -59,6 +66,7 @@ npm run preview  # preview the production build
 | `W` | Water |
 | `X` or `E` | Erase |
 | `G` | Auto-build the district around the view centre |
+| `T` | Toggle light / dark theme |
 | `H` | Toggle the pan tool |
 | Space + drag / middle-drag | Pan |
 | Wheel / pinch / `+` `-` | Zoom |
