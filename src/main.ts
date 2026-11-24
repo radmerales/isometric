@@ -769,9 +769,10 @@ function hasRoadNeighbor(gx: number, gy: number): boolean {
 
 /**
  * Fill a 17 × 17 district around the view centre. The district is anchored to
- * a 5-tile street lattice: empty street-line tiles become roads, street-facing
- * plots become houses, one corner of each block becomes a tower, and the
- * remaining courts become trees. Water and existing structures are untouched.
+ * a 5-tile street lattice: empty street-line tiles become roads, short water
+ * gaps on a street become bridges, street-facing plots become houses, one
+ * corner of each block becomes a tower, and the remaining courts become trees.
+ * Existing structures are untouched.
  */
 function autoBuild(): void {
   const rect = svg.getBoundingClientRect()
@@ -795,6 +796,67 @@ function autoBuild(): void {
       if (mod(gx, STREET_STEP) === 0 || mod(gy, STREET_STEP) === 0) {
         put(gx, gy, "road")
       }
+    }
+  }
+
+  // Short water gaps on a street line become bridges, connecting both banks.
+  for (let gy = minGy; gy <= maxGy; gy++) {
+    if (mod(gy, STREET_STEP) !== 0) continue
+    let gx = minGx
+    while (gx <= maxGx) {
+      const key = tileKey(gx, gy)
+      if (!water.has(key) || structures.has(key)) {
+        gx += 1
+        continue
+      }
+
+      let end = gx
+      while (end + 1 <= maxGx) {
+        const nextKey = tileKey(end + 1, gy)
+        if (!water.has(nextKey) || structures.has(nextKey)) break
+        end += 1
+      }
+
+      if (
+        isRoad(gx - 1, gy) &&
+        !hasWater(gx - 1, gy) &&
+        isRoad(end + 1, gy) &&
+        !hasWater(end + 1, gy) &&
+        end - gx + 1 <= 3
+      ) {
+        for (let x = gx; x <= end; x++) put(x, gy, "road")
+      }
+      gx = end + 1
+    }
+  }
+
+  for (let gx = minGx; gx <= maxGx; gx++) {
+    if (mod(gx, STREET_STEP) !== 0) continue
+    let gy = minGy
+    while (gy <= maxGy) {
+      const key = tileKey(gx, gy)
+      if (!water.has(key) || structures.has(key)) {
+        gy += 1
+        continue
+      }
+
+      let end = gy
+      while (end + 1 <= maxGy) {
+        const nextKey = tileKey(gx, end + 1)
+        if (!water.has(nextKey) || structures.has(nextKey)) break
+        end += 1
+      }
+
+      if (
+        isRoad(gx, gy - 1) &&
+        !hasWater(gx, gy - 1) &&
+        isRoad(gx, end + 1) &&
+        !hasWater(gx, end + 1) &&
+        end - gy + 1 <= 3
+      ) {
+        for (let y = gy; y <= end; y++) put(gx, y, "road")
+      }
+      gy = end + 1
     }
   }
 
@@ -863,6 +925,7 @@ const CAR_DIRECTIONS: CarDirection[] = [
 const cars: Car[] = []
 let nextCarId = 1
 let carSyncTimer: number | undefined
+let carRefillTimer: number | undefined
 
 function carPrism(base: Point[], height: number, topFill: string, sideFill: string): string {
   const top = base.map(([x, y]): Point => [x, y - height])
@@ -895,8 +958,8 @@ function carPrism(base: Point[], height: number, topFill: string, sideFill: stri
 }
 
 function carMarkup(dx: number, dy: number, palette: CarPalette): string {
-  const a: Point = [(dx - dy) * 10, (dx + dy) * 5]
-  const b: Point = [-(dx + dy) * 4, (dx - dy) * 2]
+  const a: Point = [(dx - dy) * 8, (dx + dy) * 4]
+  const b: Point = [-(dx + dy) * 3.2, (dx - dy) * 1.6]
 
   const base: Point[] = [
     addPoint(scalePoint(a, -1), b),
@@ -905,10 +968,20 @@ function carMarkup(dx: number, dy: number, palette: CarPalette): string {
     addPoint(scalePoint(a, -1), scalePoint(b, -1)),
   ]
 
-  const shadow = `<polygon points="${points(base)}" transform="translate(0 2.2)" fill="#000000" opacity="0.13"/>`
-  const body = carPrism(base, 4.5, palette.body, palette.side)
+  const bodyHeight = 3.2
+  const cabinHeight = 2.2
 
-  const cabinCenter = addPoint(scalePoint(a, -0.08), [0, -4.5])
+  const beam = `<polygon class="car-beam" points="${points([
+    addPoint(a, scalePoint(b, 0.9)),
+    addPoint(scalePoint(a, 2.7), scalePoint(b, 2)),
+    addPoint(scalePoint(a, 2.7), scalePoint(b, -2)),
+    addPoint(a, scalePoint(b, -0.9)),
+  ])}"/>`
+
+  const shadow = `<polygon points="${points(base)}" transform="translate(0 1.8)" fill="#000000" opacity="0.13"/>`
+  const body = carPrism(base, bodyHeight, palette.body, palette.side)
+
+  const cabinCenter = addPoint(scalePoint(a, -0.06), [0, -bodyHeight])
   const cabinHalfLength = scalePoint(a, 0.42)
   const cabinHalfWidth = scalePoint(b, 0.62)
   const cabinBase: Point[] = [
@@ -917,10 +990,10 @@ function carMarkup(dx: number, dy: number, palette: CarPalette): string {
     addPoint(addPoint(cabinCenter, cabinHalfLength), scalePoint(cabinHalfWidth, -1)),
     addPoint(addPoint(cabinCenter, scalePoint(cabinHalfLength, -1)), scalePoint(cabinHalfWidth, -1)),
   ]
-  const cabin = carPrism(cabinBase, 3, palette.roof, palette.side)
+  const cabin = carPrism(cabinBase, cabinHeight, palette.roof, palette.side)
 
-  const windCenter = addPoint(addPoint(cabinCenter, scalePoint(a, 0.18)), [0, -3])
-  const windHalfLength = scalePoint(a, 0.16)
+  const windCenter = addPoint(addPoint(cabinCenter, scalePoint(a, 0.16)), [0, -cabinHeight])
+  const windHalfLength = scalePoint(a, 0.15)
   const windHalfWidth = scalePoint(b, 0.48)
   const windshield = `<polygon class="car-glass" points="${points([
     addPoint(addPoint(windCenter, scalePoint(windHalfLength, -1)), windHalfWidth),
@@ -929,13 +1002,28 @@ function carMarkup(dx: number, dy: number, palette: CarPalette): string {
     addPoint(addPoint(windCenter, scalePoint(windHalfLength, -1)), scalePoint(windHalfWidth, -1)),
   ])}"/>`
 
-  return shadow + body + cabin + windshield
+  const lampY = -bodyHeight
+  const frontLamp = addPoint(scalePoint(a, 0.88), [0, lampY])
+  const rearLamp = addPoint(scalePoint(a, -0.88), [0, lampY])
+  const headlightLeft = addPoint(frontLamp, scalePoint(b, 0.55))
+  const headlightRight = addPoint(frontLamp, scalePoint(b, -0.55))
+  const taillightLeft = addPoint(rearLamp, scalePoint(b, 0.55))
+  const taillightRight = addPoint(rearLamp, scalePoint(b, -0.55))
+
+  const lights =
+    `<circle class="car-headlight" cx="${round(headlightLeft[0])}" cy="${round(headlightLeft[1])}" r="1.15"/>` +
+    `<circle class="car-headlight" cx="${round(headlightRight[0])}" cy="${round(headlightRight[1])}" r="1.15"/>` +
+    `<circle class="car-taillight" cx="${round(taillightLeft[0])}" cy="${round(taillightLeft[1])}" r="1"/>` +
+    `<circle class="car-taillight" cx="${round(taillightRight[0])}" cy="${round(taillightRight[1])}" r="1"/>`
+
+  return beam + shadow + body + cabin + windshield + lights
 }
 
 function setCarDirection(car: Car, dx: number, dy: number): void {
   if (car.dx === dx && car.dy === dy) return
   car.dx = dx
   car.dy = dy
+  car.group.setAttribute("data-dir", `${dx},${dy}`)
   car.group.innerHTML = carMarkup(dx, dy, car.palette)
 }
 
@@ -963,6 +1051,8 @@ function createCar(tile: Tile, direction: CarDirection): Car {
   const group = document.createElementNS("http://www.w3.org/2000/svg", "g")
   group.setAttribute("class", "car")
   group.setAttribute("data-id", String(id))
+  group.setAttribute("data-dir", `${direction.dx},${direction.dy}`)
+  group.style.opacity = "0"
   carsGroup.appendChild(group)
 
   const car: Car = {
@@ -981,6 +1071,11 @@ function createCar(tile: Tile, direction: CarDirection): Car {
   group.innerHTML = carMarkup(direction.dx, direction.dy, palette)
   setCarPosition(car)
   cars.push(car)
+
+  requestAnimationFrame(() => {
+    if (cars.includes(car)) group.style.opacity = "1"
+  })
+
   return car
 }
 
@@ -990,16 +1085,48 @@ function removeCar(car: Car): void {
   if (index >= 0) cars.splice(index, 1)
 }
 
+function retireCar(car: Car): void {
+  const index = cars.indexOf(car)
+  if (index < 0) return
+
+  cars.splice(index, 1)
+  car.group.style.opacity = "0"
+  window.setTimeout(() => car.group.remove(), 280)
+  scheduleCarRefill()
+}
+
+function scheduleCarRefill(): void {
+  if (carRefillTimer !== undefined) return
+  carRefillTimer = window.setTimeout(() => {
+    carRefillTimer = undefined
+    syncCars()
+  }, 550)
+}
+
+function roadDegree(gx: number, gy: number): number {
+  return (
+    Number(isRoad(gx + 1, gy)) +
+    Number(isRoad(gx - 1, gy)) +
+    Number(isRoad(gx, gy + 1)) +
+    Number(isRoad(gx, gy - 1))
+  )
+}
+
 function chooseCarDirection(car: Car): boolean {
   const options = CAR_DIRECTIONS.filter((direction) =>
     isRoad(car.gx + direction.dx, car.gy + direction.dy),
   )
-  if (options.length === 0) return false
-
   const nonReverse = options.filter(
     (direction) => !(direction.dx === -car.dx && direction.dy === -car.dy),
   )
-  const pool = nonReverse.length > 0 ? nonReverse : options
+  if (nonReverse.length === 0) return false
+
+  // Avoid turning into a cul-de-sac. Retire instead of bouncing at road ends.
+  const pool = nonReverse.filter(
+    (direction) => roadDegree(car.gx + direction.dx, car.gy + direction.dy) > 1,
+  )
+  if (pool.length === 0) return false
+
   const forward = pool.find((direction) => direction.dx === car.dx && direction.dy === car.dy)
   let next = forward
 
@@ -1017,13 +1144,21 @@ function chooseCarDirection(car: Car): boolean {
   return true
 }
 
+function canExit(tile: Tile): boolean {
+  return CAR_DIRECTIONS.some(
+    (direction) =>
+      isRoad(tile.gx + direction.dx, tile.gy + direction.dy) &&
+      roadDegree(tile.gx + direction.dx, tile.gy + direction.dy) > 1,
+  )
+}
+
 function syncCars(): void {
   const candidates: Tile[] = []
 
   for (const [key, cell] of structures) {
     if (cell !== "road") continue
     const tile = parseTileKey(key)
-    if (!hasRoadNeighbor(tile.gx, tile.gy)) continue
+    if (roadDegree(tile.gx, tile.gy) < 2 || !canExit(tile)) continue
     candidates.push(tile)
   }
 
@@ -1031,7 +1166,7 @@ function syncCars(): void {
     candidates.length === 0 ? 0 : clamp(Math.round(candidates.length / 10), 2, 18)
 
   for (const car of [...cars]) {
-    if (!isRoad(car.gx, car.gy)) removeCar(car)
+    if (!isRoad(car.gx, car.gy)) retireCar(car)
   }
   while (cars.length > target) {
     removeCar(cars[cars.length - 1])
@@ -1051,8 +1186,10 @@ function syncCars(): void {
     )
     if (tooClose) continue
 
-    const directions = CAR_DIRECTIONS.filter((direction) =>
-      isRoad(tile.gx + direction.dx, tile.gy + direction.dy),
+    const directions = CAR_DIRECTIONS.filter(
+      (direction) =>
+        isRoad(tile.gx + direction.dx, tile.gy + direction.dy) &&
+        roadDegree(tile.gx + direction.dx, tile.gy + direction.dy) > 1,
     )
     if (directions.length === 0) continue
 
@@ -1064,18 +1201,14 @@ function syncCars(): void {
 function updateCars(dt: number): void {
   for (const car of [...cars]) {
     if (!isRoad(car.gx, car.gy)) {
-      removeCar(car)
+      retireCar(car)
       continue
     }
 
     if (!isRoad(car.gx + car.dx, car.gy + car.dy)) {
       car.progress = 0
-      if (!chooseCarDirection(car)) {
-        removeCar(car)
-        continue
-      }
-      if (!isRoad(car.gx + car.dx, car.gy + car.dy)) {
-        removeCar(car)
+      if (!chooseCarDirection(car) || !isRoad(car.gx + car.dx, car.gy + car.dy)) {
+        retireCar(car)
         continue
       }
     }
@@ -1089,7 +1222,7 @@ function updateCars(dt: number): void {
       car.steps += 1
 
       if (!isRoad(car.gx, car.gy) || !chooseCarDirection(car)) {
-        removeCar(car)
+        retireCar(car)
         continue
       }
     }

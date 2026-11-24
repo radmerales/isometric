@@ -436,6 +436,10 @@ button {
   stroke-linecap: round;
 }
 
+.car {
+  transition: opacity 180ms ease;
+}
+
 .car .car-body,
 .car .car-side {
   stroke: var(--line);
@@ -446,6 +450,39 @@ button {
 .car .car-glass {
   stroke: none;
   fill: #2f2e2b;
+}
+
+.car-beam,
+.car-headlight,
+.car-taillight {
+  opacity: 0;
+}
+
+.car-beam {
+  fill: #f5c518;
+}
+
+.car-headlight {
+  fill: #fff3c4;
+}
+
+.car-taillight {
+  fill: #d14b39;
+}
+
+[data-theme="dark"] .car-headlight {
+  opacity: 1;
+  filter: drop-shadow(0 0 2.5px #ffe08a);
+}
+
+[data-theme="dark"] .car-taillight {
+  opacity: 1;
+  filter: drop-shadow(0 0 2px #e05a45);
+}
+
+[data-theme="dark"] .car-beam {
+  opacity: 0.18;
+  filter: blur(1.5px);
 }
 
 .road-mark line {

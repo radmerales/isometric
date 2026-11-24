@@ -20,13 +20,14 @@ deploys to GitHub Pages with no backend.
 - Endless isometric grid with pan, zoom, and a seeded winding river
 - Rule-based **Auto-build**: a 17 × 17 district anchored to a 5-tile street grid
   - Empty street-line tiles become roads
+  - Short water gaps on a street become bridges, connecting both banks
   - Street-facing plots become houses, with a tower at one corner of each block
   - Courtyard plots become trees
-  - Water and existing structures are never overwritten
+  - Existing structures are never overwritten
 - **Lakehouses** anywhere within two tiles of water get a blue roof, a deck, and
   blue window glass
-- **Moving cars** follow the road network, turn at intersections, and scale with
-  the size of the city
+- **Moving cars** are scaled to the buildings, avoid dead ends instead of
+  U-turning, and switch on headlights, taillights, and light pools in dark mode
 - **Light and dark themes** with a header toggle, saved per browser; lit windows
   appear at night
 - Roads auto-connect; roads laid over water become bridges
@@ -74,7 +75,8 @@ npm run preview  # preview the production build
 
 The **Clear** button removes buildings, roads, and trees but keeps the river.
 The eraser removes structures first, then water. Cars are decorative and respawn
-on reload.
+on reload. Road links over water are bridges, both by hand and in auto-built
+districts.
 
 ## Deploy
 
